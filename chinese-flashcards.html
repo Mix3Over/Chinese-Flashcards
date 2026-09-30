@@ -1,0 +1,558 @@
+<title>Chinese Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700&display=swap">
+<style>
+/* Layout: one-column phone app, stacked screens (decks → deck → study), card set on a 田字格 practice grid */
+:root{
+  --bg:#EEF2EF; --surface:#FFFFFF; --sunk:#E3E9E5; --ink:#17211D; --muted:#5E6B66; --line:#D2DBD6;
+  --accent:#17715A; --accent-ink:#FFFFFF; --accent-soft:#D6EBE3; --seal:#B8322A; --grid:#E2B9B4;
+  --t1:#C8332B; --t2:#C77A0A; --t3:#2E8B45; --t4:#2A5FB8; --t5:#7B8580;
+  --shadow:0 1px 2px rgba(20,40,32,.06),0 8px 24px rgba(20,40,32,.08);
+  --f-ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-han:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1412; --surface:#18211E; --sunk:#111917; --ink:#E4ECE8; --muted:#95A39D; --line:#2A3632;
+  --accent:#4FBF94; --accent-ink:#06150F; --accent-soft:#1D3A30; --seal:#E0645A; --grid:#5A3431;
+  --t1:#F0675E; --t2:#EBA53C; --t3:#5CC67A; --t4:#6E9CF0; --t5:#8E9A95;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1412; --surface:#18211E; --sunk:#111917; --ink:#E4ECE8; --muted:#95A39D; --line:#2A3632;
+  --accent:#4FBF94; --accent-ink:#06150F; --accent-soft:#1D3A30; --seal:#E0645A; --grid:#5A3431;
+  --t1:#F0675E; --t2:#EBA53C; --t3:#5CC67A; --t4:#6E9CF0; --t5:#8E9A95;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+*{box-sizing:border-box}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.han{font-family:var(--f-han);font-weight:500}
+.t1{color:var(--t1)}.t2{color:var(--t2)}.t3{color:var(--t3)}.t4{color:var(--t4)}.t5{color:var(--t5)}
+
+#app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding-inline:16px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding-block:12px 10px;min-height:56px}
+.bar h1{font-size:20px;font-weight:700;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.01em}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:0;background:transparent;display:grid;place-items:center;flex:none}
+.icon-btn:active{background:var(--sunk)}
+.icon-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+main{flex:1;display:flex;flex-direction:column;gap:16px;padding-bottom:24px}
+
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:600;background:var(--sunk);min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--seal);border:1px solid var(--line)}
+.btn.block{width:100%}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.45}
+
+/* Home */
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:4px 2px}
+.hero .big{font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.hero .lbl{color:var(--muted);font-size:14px}
+.seal{font-family:var(--f-han);font-weight:700;color:var(--seal);border:2px solid var(--seal);border-radius:6px;width:52px;height:52px;display:grid;place-items:center;font-size:24px;line-height:1;transform:rotate(-4deg);flex:none}
+.list{display:flex;flex-direction:column;background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:transparent;text-align:left;width:100%;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row:active{background:var(--sunk)}
+.row .main{flex:1;min-width:0}
+.row .name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{color:var(--muted);font-size:14px}
+.chip{font-size:13px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.zero{background:var(--sunk);color:var(--muted)}
+.chev{color:var(--muted);flex:none}
+.foot{color:var(--muted);font-size:13px;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--accent)}
+.empty{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:28px 20px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty h2{margin:0;font-size:20px;text-wrap:balance}
+.empty p{margin:0;color:var(--muted);max-width:32ch}
+.empty .han{font-size:56px;color:var(--seal);line-height:1.1}
+.stack{display:flex;flex-direction:column;gap:10px;width:100%}
+
+/* Deck */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--surface);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.seg{display:flex;background:var(--sunk);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:8px 6px;font-size:14px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.section-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.section-h h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:700}
+.search{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;min-height:44px;font-size:16px}
+.crow .h{font-size:24px;min-width:3.2em;line-height:1.2}
+.crow .p{font-size:14px}
+.crow .m{color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.boxes{display:flex;gap:3px;flex:none}
+.boxes i{width:5px;height:14px;border-radius:2px;background:var(--line)}
+.boxes i.f{background:var(--accent)}
+.muted{color:var(--muted)}
+.note{font-size:14px;color:var(--muted);text-align:center;margin:0}
+
+/* Study */
+.study{flex:1;display:flex;flex-direction:column;gap:14px;padding-bottom:12px}
+.prog{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .3s}
+.card{flex:1;min-height:340px;background:var(--surface);border-radius:20px;box-shadow:var(--shadow);border:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px 18px;position:relative;text-align:center}
+.tzg{position:relative;width:min(62vw,220px);aspect-ratio:1;max-width:100%;display:grid;place-items:center}
+.tzg svg{position:absolute;inset:0;width:100%;height:100%}
+.tzg svg *{stroke:var(--grid);fill:none}
+.tzg .han{position:relative;font-size:clamp(56px,20vw,120px);line-height:1;white-space:nowrap}
+.tzg.long .han{font-size:clamp(40px,12vw,76px)}
+.tzg.xlong .han{font-size:clamp(28px,8vw,48px);white-space:normal}
+.card .meaning{font-size:24px;font-weight:600;max-width:24ch;text-wrap:balance;overflow-wrap:anywhere}
+.card .pinyin{font-size:26px;font-weight:500;letter-spacing:.01em}
+.card .hint{position:absolute;bottom:14px;left:0;right:0;font-size:13px;color:var(--muted)}
+.card .reveal{display:flex;flex-direction:column;gap:8px;align-items:center}
+.card .divider{width:40px;height:2px;background:var(--line);border-radius:2px}
+.speak{position:absolute;top:12px;right:12px}
+.grades{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grades .btn{flex-direction:column;gap:0;padding:8px 6px;min-height:58px}
+.grades small{font-weight:500;font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
+.g-again{background:var(--sunk);color:var(--seal)}
+.g-good{background:var(--accent);color:var(--accent-ink)}
+.g-easy{background:var(--accent-soft);color:var(--accent)}
+.done{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding-top:40px}
+.done .han{font-size:72px;color:var(--accent)}
+
+/* Sheet */
+.scrim{position:fixed;inset:0;background:rgba(8,14,12,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:10px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:92%;overflow:auto;display:flex;flex-direction:column;gap:14px;animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}.prog i{transition:none}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}
+.sheet h2{margin:0;font-size:18px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:600;color:var(--muted)}
+.field input,.field textarea{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;font-size:17px;width:100%;min-width:0}
+.field textarea{min-height:170px;resize:vertical;font-size:16px}
+.field input.han{font-size:26px}
+.preview{font-size:14px;color:var(--muted);min-height:1.2em}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 140px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:40;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
+</style>
+
+<div id="app"></div>
+<div id="sheetRoot"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const KEY = 'chinese-flashcards-v1';
+const PREF = 'chinese-flashcards-prefs';
+const DAY = 86400000;
+const INTERVALS = [0, 1, 3, 7, 14, 30, 60, 120]; // days per box
+const NEW_PER_SESSION = 20;
+
+const STARTER = [
+ ['你好','ni3 hao3','hello'],['谢谢','xie4 xie5','thank you'],['再见','zai4 jian4','goodbye'],
+ ['我','wo3','I, me'],['你','ni3','you'],['他','ta1','he, him'],['是','shi4','to be'],
+ ['不','bu4','not, no'],['好','hao3','good'],['人','ren2','person'],['中国','Zhong1 guo2','China'],
+ ['朋友','peng2 you5','friend'],['老师','lao3 shi1','teacher'],['学生','xue2 sheng5','student'],
+ ['吃','chi1','to eat'],['喝','he1','to drink'],['水','shui3','water'],['茶','cha2','tea'],
+ ['米饭','mi3 fan4','cooked rice'],['今天','jin1 tian1','today'],['明天','ming2 tian1','tomorrow'],
+ ['昨天','zuo2 tian1','yesterday'],['一','yi1','one'],['二','er4','two'],['三','san1','three'],
+ ['大','da4','big'],['小','xiao3','small'],['爱','ai4','to love'],['书','shu1','book'],
+ ['家','jia1','home, family'],['猫','mao1','cat'],['狗','gou3','dog']
+];
+
+/* ---------- pinyin ---------- */
+const MARKS = {a:'āáǎàa',e:'ēéěèe',i:'īíǐìi',o:'ōóǒòo',u:'ūúǔùu','ü':'ǖǘǚǜü'};
+const TONE_OF = {};
+for (const v in MARKS) [...MARKS[v]].slice(0,4).forEach((ch,i)=>{ TONE_OF[ch]=i+1; TONE_OF[ch.toUpperCase()]=i+1; });
+function markSyl(syl, tone){
+  syl = syl.replace(/u:|v/g,'ü').replace(/U:|V/g,'Ü');
+  if (tone===5 || tone===0) return syl;
+  const low = syl.toLowerCase();
+  let idx = low.indexOf('a');
+  if (idx<0) idx = low.indexOf('e');
+  if (idx<0 && low.includes('ou')) idx = low.indexOf('o');
+  if (idx<0) { for (let i=low.length-1;i>=0;i--) if ('aeiouü'.includes(low[i])) { idx=i; break; } }
+  if (idx<0) return syl;
+  const m = MARKS[low[idx]][tone-1];
+  const out = syl[idx]===low[idx] ? m : m.toUpperCase();
+  return syl.slice(0,idx)+out+syl.slice(idx+1);
+}
+function toMarks(s){
+  return String(s||'').replace(/([a-zA-ZüÜ:]+?)([1-5])/g,(_,syl,t)=>markSyl(syl,+t)).replace(/\s+/g,' ').trim();
+}
+function toneOf(syl){ for (const ch of syl) if (TONE_OF[ch]) return TONE_OF[ch]; return 5; }
+function pinyinHTML(p){
+  return String(p||'').split(/(\s+)/).map(w=>/\s/.test(w)||!w ? w : `<span class="t${toneOf(w)}">${esc(w)}</span>`).join('');
+}
+function hanziHTML(h,p){
+  const chars=[...String(h||'')].filter(c=>!/\s/.test(c));
+  const syls=String(p||'').trim().split(/\s+/).filter(Boolean);
+  if (!syls.length || chars.length!==syls.length || !chars.every(c=>/\p{Script=Han}/u.test(c))) return esc(h);
+  return chars.map((c,i)=>`<span class="t${toneOf(syls[i])}">${esc(c)}</span>`).join('');
+}
+
+/* ---------- utils ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const dayStart = t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();};
+const plural = (n,w)=>`${n} ${w}${n===1?'':'s'}`;
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600);}
+const ICON = {
+  back:'<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+  plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+  close:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  speak:'<svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
+};
+const GRID = '<svg viewBox="0 0 100 100" aria-hidden="true"><rect x="1" y="1" width="98" height="98" stroke-width="1.5"/><path d="M50 1V99M1 50H99" stroke-width=".8" stroke-dasharray="3 3"/><path d="M1 1L99 99M99 1L1 99" stroke-width=".6" stroke-dasharray="2 3"/></svg>';
+
+function speak(text){
+  try{
+    const s=window.speechSynthesis; if(!s||!window.SpeechSynthesisUtterance){toast('Audio isn’t available on this device');return;}
+    s.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=.8;
+    const v=s.getVoices().find(v=>/^zh[-_](CN|Hans)/i.test(v.lang)); if(v) u.voice=v; s.speak(u);
+  }catch(e){toast('Audio isn’t available on this device');}
+}
+
+/* ---------- prefs (per device) ---------- */
+let prefs={dir:'h2m'};
+try{Object.assign(prefs,JSON.parse(localStorage.getItem(PREF)||'{}'));}catch(e){}
+const savePrefs=()=>{try{localStorage.setItem(PREF,JSON.stringify(prefs));}catch(e){}};
+
+/* ---------- store & sync ---------- */
+const store={decks:{},uid:null,mode:'local'};
+try{const j=JSON.parse(localStorage.getItem(KEY)||'null'); if(j&&j.decks){store.decks=j.decks; store.cacheUid=j.uid||null;}}catch(e){}
+function saveCache(){try{localStorage.setItem(KEY,JSON.stringify({decks:store.decks,uid:store.uid}));}catch(e){}}
+let col=null; const dirty=new Set(), inflight=new Set(); let flushT=null, flushing=false;
+function changed(id){ saveCache(); if(!col) return; dirty.add(id); clearTimeout(flushT); flushT=setTimeout(flush,700); }
+async function flush(){
+  if(!col||flushing) return; flushing=true;
+  try{
+    while(dirty.size){
+      const id=dirty.values().next().value; dirty.delete(id); inflight.add(id);
+      const d=store.decks[id];
+      try{
+        if(d) await col.doc(id).set({name:d.name,created:d.created,cards:d.cards});
+        else await col.doc(id).delete();
+      }catch(e){
+        const code=e&&e.code;
+        if(code==='quota_exceeded'||code==='invalid_argument'){toast('This deck is too large to sync. It is still saved on this device.');}
+        else if(code==='revoked'||code==='not_granted'){col=null;store.mode='local';refresh();break;}
+        else{dirty.add(id);setTimeout(flush,2500+Math.random()*2000);break;}
+      }finally{inflight.delete(id);}
+    }
+  }finally{flushing=false;}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){clearTimeout(flushT);flush();}});
+
+async function connect(){
+  if(!window.claude||typeof window.claude.use!=='function') return;
+  try{
+    const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    if(!db||!user) return;
+    const id=await user.id(); if(!id) return;
+    store.uid=id; col=db.collection('data/users/'+id); store.mode='sync'; refresh();
+    let first=true;
+    col.onSnapshot(snap=>{
+      if(first&&snap.metadata.fromCache&&snap.empty) return;
+      const next={};
+      snap.docs.forEach(doc=>{const d=doc.data(); if(d) next[doc.id]={id:doc.id,name:d.name||'Untitled',created:d.created||0,cards:(d.cards||[]).map(c=>({...c}))};});
+      if(first){
+        first=false;
+        // Move decks made on this device before syncing into the account
+        if(!store.cacheUid){ for(const k in store.decks){ if(!next[k]){ next[k]=store.decks[k]; dirty.add(k);} } }
+        if(dirty.size){clearTimeout(flushT);flushT=setTimeout(flush,300);}
+      }
+      for(const k of [...dirty,...inflight]){ if(store.decks[k]) next[k]=store.decks[k]; else delete next[k]; }
+      store.decks=next; store.cacheUid=id; saveCache(); refresh();
+    },err=>{col=null;store.mode='local';refresh();});
+  }catch(e){}
+}
+
+/* ---------- scheduling ---------- */
+const now=()=>Date.now();
+const isNew=c=>!c.seen;
+const isDue=c=>c.seen&&(c.due||0)<=now();
+function counts(deck){
+  let n=0,d=0,l=0; for(const c of deck.cards){ if(isNew(c)) n++; else if(isDue(c)) d++; if((c.box||0)>=3) l++; }
+  return {newC:n,due:d,learned:l,total:deck.cards.length,todo:d+Math.min(n,NEW_PER_SESSION)};
+}
+function nextBox(c,g){ const b=c.box||0; return g==='again'?0:g==='good'?Math.min(b+1,7):Math.min(b+2,7); }
+function fmtDays(n){ if(n===0) return 'now'; if(n<30) return n+'d'; if(n<365) return Math.round(n/30)+'mo'; return Math.round(n/365)+'y'; }
+function gradeLabel(c,g){ return g==='again'?'again soon':fmtDays(INTERVALS[nextBox(c,g)]); }
+function applyGrade(c,g){
+  c.box=nextBox(c,g); c.seen=true;
+  c.due = g==='again' ? now() : dayStart(now())+INTERVALS[c.box]*DAY;
+}
+
+/* ---------- routing ---------- */
+let view={name:'home'};
+const app=$('#app');
+function go(v){ view=v; render(); window.scrollTo(0,0); }
+function refresh(){
+  if(view.name==='home') render();
+  else if(view.name==='deck'){ if(!store.decks[view.id]) go({name:'home'}); else updateDeck(); }
+  else if(view.name==='study'&&!store.decks[view.id]) go({name:'home'});
+}
+function render(){
+  if(view.name==='home') renderHome();
+  else if(view.name==='deck') renderDeck();
+  else if(view.name==='study') renderStudy();
+}
+const sortedDecks=()=>Object.values(store.decks).sort((a,b)=>(a.created||0)-(b.created||0));
+
+/* ---------- home ---------- */
+function renderHome(){
+  const decks=sortedDecks();
+  const todo=decks.reduce((s,d)=>s+counts(d).todo,0);
+  const syncLine = store.mode==='sync'
+    ? '<span class="dot on"></span>Synced to your Claude account'
+    : '<span class="dot"></span>Saved on this device';
+  app.innerHTML=`
+  <header class="bar"><h1>Chinese Flashcards</h1>
+    <button class="icon-btn" id="newDeck" aria-label="New deck">${ICON.plus}</button></header>
+  <main>
+    ${decks.length?`
+    <div class="hero"><div><div class="big">${todo}</div><div class="lbl">${todo===1?'card':'cards'} to study today</div></div><div class="seal" aria-hidden="true">学</div></div>
+    <div class="list">${decks.map(d=>{const c=counts(d);return `
+      <button class="row" data-deck="${esc(d.id)}">
+        <div class="main"><div class="name">${esc(d.name)}</div><div class="sub">${plural(c.total,'card')} · ${c.learned} learned</div></div>
+        <span class="chip ${c.todo?'':'zero'}">${c.todo?c.todo+' due':'done'}</span><span class="chev">${ICON.chev}</span>
+      </button>`;}).join('')}</div>
+    `:`
+    <div class="empty"><div class="han" aria-hidden="true">字</div><h2>No decks yet</h2>
+      <p>Start with 32 common HSK 1 words, or make your own deck and add cards.</p>
+      <div class="stack"><button class="btn primary block" id="starter">Add HSK 1 starter deck</button>
+      <button class="btn ghost block" id="newDeck2">Create an empty deck</button></div></div>`}
+    <p class="foot">${syncLine}</p>
+  </main>`;
+  app.querySelectorAll('[data-deck]').forEach(b=>b.onclick=()=>go({name:'deck',id:b.dataset.deck}));
+  const nd=()=>deckSheet(); $('#newDeck').onclick=nd; const n2=$('#newDeck2'); if(n2) n2.onclick=nd;
+  const st=$('#starter'); if(st) st.onclick=()=>{
+    const id=uid('d'); store.decks[id]={id,name:'HSK 1 starter',created:now(),cards:STARTER.map(([h,p,m])=>({id:uid('c'),h,p:toMarks(p),m,box:0,seen:false,due:0}))};
+    changed(id); render(); toast('Added 32 cards');
+  };
+}
+
+/* ---------- deck ---------- */
+let deckQuery='';
+function renderDeck(){
+  const d=store.decks[view.id];
+  app.innerHTML=`
+  <header class="bar"><button class="icon-btn" id="back" aria-label="Back to decks">${ICON.back}</button>
+    <h1 id="deckName"></h1><button class="icon-btn" id="deckMenu" aria-label="Deck options">${ICON.more}</button></header>
+  <main>
+    <div class="stats" id="stats"></div>
+    <div class="seg" role="group" aria-label="Card front">
+      <button id="dir-h2m" aria-pressed="${prefs.dir==='h2m'}">汉字 → English</button>
+      <button id="dir-m2h" aria-pressed="${prefs.dir==='m2h'}">English → 汉字</button>
+    </div>
+    <div id="studyBtns" class="stack"></div>
+    <div class="section-h"><h2 id="cardsH">Cards</h2>
+      <div class="btnrow" style="flex-wrap:nowrap"><button class="btn ghost" id="import" style="min-height:38px;padding:6px 12px">Import</button>
+      <button class="btn primary" id="addCard" style="min-height:38px;padding:6px 12px">${ICON.plus.replace('<svg','<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"')} Add</button></div></div>
+    <input class="search" id="search" type="search" placeholder="Search characters, pinyin or meaning" autocomplete="off" value="${esc(deckQuery)}">
+    <div id="cardList"></div>
+  </main>`;
+  $('#back').onclick=()=>{deckQuery='';go({name:'home'});};
+  $('#deckMenu').onclick=()=>deckSheet(d.id);
+  $('#dir-h2m').onclick=()=>{prefs.dir='h2m';savePrefs();renderDeck();};
+  $('#dir-m2h').onclick=()=>{prefs.dir='m2h';savePrefs();renderDeck();};
+  $('#addCard').onclick=()=>cardSheet(d.id);
+  $('#import').onclick=()=>importSheet(d.id);
+  $('#search').oninput=e=>{deckQuery=e.target.value;updateDeck();};
+  updateDeck();
+}
+function updateDeck(){
+  const d=store.decks[view.id]; if(!d) return;
+  const c=counts(d);
+  $('#deckName').textContent=d.name;
+  $('#stats').innerHTML=`<div class="stat"><b>${c.due}</b><span>Due</span></div><div class="stat"><b>${c.newC}</b><span>New</span></div><div class="stat"><b>${c.learned}</b><span>Learned</span></div>`;
+  $('#studyBtns').innerHTML = c.total===0 ? '' : c.todo
+    ? `<button class="btn primary block" id="study">Study ${plural(c.todo,'card')}</button>`
+    : `<p class="note">All caught up for today.</p><button class="btn ghost block" id="practice">Practice all ${plural(c.total,'card')} anyway</button>`;
+  const s=$('#study'); if(s) s.onclick=()=>startStudy(d.id,false);
+  const p=$('#practice'); if(p) p.onclick=()=>startStudy(d.id,true);
+  $('#cardsH').textContent=`Cards · ${c.total}`;
+  const q=deckQuery.trim().toLowerCase();
+  const strip=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const list=d.cards.filter(x=>!q||x.h.toLowerCase().includes(q)||strip(x.p.toLowerCase()).includes(strip(q))||x.m.toLowerCase().includes(q));
+  $('#search').hidden=c.total<8;
+  $('#cardList').innerHTML = c.total===0
+    ? `<div class="empty"><h2>This deck is empty</h2><p>Add cards one at a time, or paste a whole word list with Import.</p></div>`
+    : list.length ? `<div class="list">${list.map(x=>`
+      <button class="row crow" data-card="${esc(x.id)}">
+        <span class="h han">${hanziHTML(x.h,x.p)}</span>
+        <div class="main"><div class="p">${pinyinHTML(x.p)}</div><div class="m">${esc(x.m)}</div></div>
+        <span class="boxes" aria-label="Level ${x.box||0} of 7">${[1,2,3,4,5,6,7].map(i=>`<i class="${(x.box||0)>=i?'f':''}"></i>`).join('')}</span>
+      </button>`).join('')}</div>`
+    : `<p class="note">No cards match “${esc(deckQuery)}”.</p>`;
+  $('#cardList').querySelectorAll('[data-card]').forEach(b=>b.onclick=()=>cardSheet(d.id,b.dataset.card));
+}
+
+/* ---------- study ---------- */
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function startStudy(deckId,all){
+  const d=store.decks[deckId];
+  let ids;
+  if(all) ids=shuffle(d.cards.map(c=>c.id));
+  else{
+    const due=d.cards.filter(isDue).map(c=>c.id);
+    const fresh=d.cards.filter(isNew).slice(0,NEW_PER_SESSION).map(c=>c.id);
+    ids=shuffle(due).concat(fresh);
+  }
+  go({name:'study',id:deckId,queue:ids,total:ids.length,done:0,again:0,revealed:false,dir:prefs.dir});
+}
+function curCard(){ const d=store.decks[view.id]; if(!d) return null; while(view.queue.length){ const c=d.cards.find(x=>x.id===view.queue[0]); if(c) return c; view.queue.shift(); } return null; }
+function renderStudy(){
+  const c=curCard();
+  const back=`<header class="bar"><button class="icon-btn" id="back" aria-label="Stop studying">${ICON.close}</button><h1>${esc(store.decks[view.id].name)}</h1><span class="muted" style="font-variant-numeric:tabular-nums">${c?view.queue.length+' left':''}</span></header>`;
+  if(!c){
+    app.innerHTML=`${back}<main><div class="done"><div class="han" aria-hidden="true">好</div><h2 style="margin:0">Session complete</h2>
+      <p class="muted" style="margin:0">You reviewed ${plural(view.done,'card')}${view.again?` and repeated ${view.again} you missed`:''}.</p>
+      <button class="btn primary" id="fin">Back to deck</button></div></main>`;
+    $('#back').onclick=$('#fin').onclick=()=>go({name:'deck',id:view.id}); return;
+  }
+  const h2m=view.dir==='h2m';
+  const n=[...c.h].length, cls=n>6?'xlong':n>2?'long':'';
+  const hanBlock=`<div class="tzg ${cls}">${n<=2?GRID:''}<span class="han">${view.revealed?hanziHTML(c.h,c.p):esc(c.h)}</span></div>`;
+  const front = h2m ? hanBlock : `<div class="meaning">${esc(c.m)}</div>`;
+  const reveal = view.revealed ? (h2m
+      ? `<div class="reveal"><div class="divider"></div><div class="pinyin">${pinyinHTML(c.p)}</div><div class="meaning">${esc(c.m)}</div></div>`
+      : `<div class="reveal"><div class="divider"></div>${hanBlock}<div class="pinyin">${pinyinHTML(c.p)}</div></div>`) : '';
+  const pct = view.total ? Math.round(100*view.done/(view.done+view.queue.length)) : 0;
+  app.innerHTML=`${back}<div class="study">
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <button class="card" id="card" aria-label="${view.revealed?'Card':'Show answer'}">
+      ${front}${reveal}
+      ${view.revealed?'':'<span class="hint">Tap to show answer</span>'}
+    </button>
+    ${view.revealed?`<div class="grades">
+      <button class="btn g-again" data-g="again">Again<small>${gradeLabel(c,'again')}</small></button>
+      <button class="btn g-good" data-g="good">Good<small>${gradeLabel(c,'good')}</small></button>
+      <button class="btn g-easy" data-g="easy">Easy<small>${gradeLabel(c,'easy')}</small></button></div>`
+      :`<button class="btn primary block" id="show" style="min-height:58px">Show answer</button>`}
+  </div>`;
+  if(h2m||view.revealed){
+    const sp=document.createElement('button'); sp.className='icon-btn speak'; sp.setAttribute('aria-label','Play pronunciation'); sp.innerHTML=ICON.speak;
+    sp.onclick=e=>{e.stopPropagation();speak(c.h);};
+    $('#card').appendChild(sp);
+  }
+  $('#back').onclick=()=>{flush();go({name:'deck',id:view.id});};
+  const show=()=>{ if(!view.revealed){view.revealed=true;renderStudy();} };
+  $('#card').onclick=show; const sb=$('#show'); if(sb) sb.onclick=show;
+  app.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>grade(b.dataset.g));
+}
+function grade(g){
+  const c=curCard(); if(!c) return;
+  applyGrade(c,g); view.queue.shift();
+  if(g==='again'){ view.again++; view.queue.splice(Math.min(3,view.queue.length),0,c.id); }
+  else view.done++;
+  view.revealed=false; changed(view.id); renderStudy();
+}
+document.addEventListener('keydown',e=>{
+  if(view.name!=='study'||$('#sheetRoot').firstChild||/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(e.key===' '||e.key==='Enter'){ if(!view.revealed){e.preventDefault();view.revealed=true;renderStudy();} }
+  else if(view.revealed&&['1','2','3'].includes(e.key)) grade(['again','good','easy'][+e.key-1]);
+});
+
+/* ---------- sheets ---------- */
+function openSheet(html){
+  const root=$('#sheetRoot');
+  root.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;
+  $('#scrim').onclick=e=>{if(e.target.id==='scrim') closeSheet();};
+  return root;
+}
+function closeSheet(){ $('#sheetRoot').innerHTML=''; }
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#sheetRoot').firstChild) closeSheet();});
+function armConfirm(btn,label,fn){
+  let armed=false,t;
+  btn.onclick=()=>{ if(armed){clearTimeout(t);fn();return;} armed=true; const old=btn.textContent; btn.textContent=label;
+    t=setTimeout(()=>{armed=false;btn.textContent=old;},3000); };
+}
+
+function deckSheet(deckId){
+  const d=deckId&&store.decks[deckId];
+  openSheet(`<h2>${d?'Deck options':'New deck'}</h2>
+    <form id="f" class="stack" style="gap:14px">
+      <div class="field"><label for="dn">Deck name</label><input id="dn" maxlength="60" placeholder="e.g. HSK 2, Food words" value="${d?esc(d.name):''}" required></div>
+      <div class="btnrow"><button class="btn primary" type="submit">${d?'Save name':'Create deck'}</button></div>
+      ${d?'<button class="btn danger block" type="button" id="del">Delete deck</button>':''}
+    </form>`);
+  const inp=$('#dn'); setTimeout(()=>inp.focus(),50);
+  $('#f').onsubmit=e=>{e.preventDefault(); const name=inp.value.trim(); if(!name) return;
+    if(d){ d.name=name; changed(d.id); closeSheet(); render(); }
+    else{ const id=uid('d'); store.decks[id]={id,name,created:now(),cards:[]}; changed(id); closeSheet(); go({name:'deck',id}); } };
+  const del=$('#del'); if(del) armConfirm(del,`Tap again to delete ${plural(d.cards.length,'card')}`,()=>{
+    delete store.decks[d.id]; changed(d.id); closeSheet(); go({name:'home'}); toast('Deck deleted'); });
+}
+
+function cardSheet(deckId,cardId){
+  const d=store.decks[deckId]; const c=cardId&&d.cards.find(x=>x.id===cardId);
+  openSheet(`<h2>${c?'Edit card':'New card'}</h2>
+    <form id="f" class="stack" style="gap:14px">
+      <div class="field"><label for="ch">Characters</label><input id="ch" class="han" lang="zh-CN" placeholder="你好" value="${c?esc(c.h):''}" autocomplete="off" required></div>
+      <div class="field"><label for="cp">Pinyin <span style="font-weight:400">· type tone numbers, e.g. ni3 hao3</span></label>
+        <input id="cp" placeholder="ni3 hao3" value="${c?esc(c.p):''}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="preview" id="pv"></div></div>
+      <div class="field"><label for="cm">Meaning</label><input id="cm" placeholder="hello" value="${c?esc(c.m):''}" autocomplete="off" required></div>
+      <div class="btnrow">${c?'<button class="btn primary" type="submit">Save</button>'
+        :'<button class="btn ghost" type="submit" data-more="1">Save &amp; add another</button><button class="btn primary" type="submit">Save</button>'}</div>
+      ${c?`<div class="btnrow"><button class="btn ghost" type="button" id="reset">Reset progress</button><button class="btn danger" type="button" id="del">Delete card</button></div>`:''}
+    </form>`);
+  const ch=$('#ch'),cp=$('#cp'),cm=$('#cm'),pv=$('#pv');
+  const upd=()=>{ const m=toMarks(cp.value); pv.innerHTML=m&&m!==cp.value.trim()?pinyinHTML(m):(m?pinyinHTML(m):''); };
+  cp.oninput=upd; upd(); if(!c) setTimeout(()=>ch.focus(),50);
+  let more=false; $('#f').querySelectorAll('[type=submit]').forEach(b=>b.onclick=()=>{more=!!b.dataset.more;});
+  $('#f').onsubmit=e=>{ e.preventDefault();
+    const h=ch.value.trim(), p=toMarks(cp.value), m=cm.value.trim(); if(!h||!m) return;
+    if(c){ Object.assign(c,{h,p,m}); } else d.cards.unshift({id:uid('c'),h,p,m,box:0,seen:false,due:0});
+    changed(d.id); updateDeck();
+    if(more){ ch.value=cp.value=cm.value=''; upd(); ch.focus(); toast('Card added'); } else closeSheet();
+  };
+  if(c){
+    armConfirm($('#del'),'Tap again to delete',()=>{ d.cards=d.cards.filter(x=>x.id!==c.id); changed(d.id); closeSheet(); updateDeck(); });
+    $('#reset').onclick=()=>{ Object.assign(c,{box:0,seen:false,due:0}); changed(d.id); closeSheet(); updateDeck(); toast('Card will show up as new'); };
+  }
+}
+
+function parseLines(text){
+  const out=[];
+  for(const raw of String(text).split(/\r?\n/)){
+    const line=raw.trim(); if(!line) continue;
+    let parts = line.includes('\t') ? line.split('\t') : line.split(/\s*[,，;；|]\s*|\s+[-–—]\s+/);
+    parts=parts.map(s=>s.trim()).filter(Boolean);
+    if(parts.length<2) continue;
+    const h=parts[0];
+    let p='',m;
+    if(parts.length===2) m=parts[1]; else { p=parts[1]; m=parts.slice(2).join(', '); }
+    out.push({h,p:toMarks(p),m});
+  }
+  return out;
+}
+function importSheet(deckId){
+  const d=store.decks[deckId];
+  openSheet(`<h2>Import words</h2>
+    <p class="muted" style="margin:0;font-size:14px">One word per line: characters, pinyin, meaning. Commas, tabs or semicolons all work, so you can paste straight from a spreadsheet.</p>
+    <form id="f" class="stack" style="gap:14px">
+      <div class="field"><label for="ta">Word list</label><textarea id="ta" lang="zh-CN" placeholder="银行, yin2 hang2, bank&#10;医生, yi1 sheng1, doctor&#10;飞机, fei1 ji1, airplane"></textarea><div class="preview" id="pv">Nothing to import yet</div></div>
+      <button class="btn primary block" type="submit" id="go" disabled>Import</button>
+    </form>`);
+  const ta=$('#ta'),pv=$('#pv'),go_=$('#go');
+  ta.oninput=()=>{ const r=parseLines(ta.value); pv.textContent=r.length?`${plural(r.length,'card')} ready`:'Nothing to import yet'; go_.disabled=!r.length; go_.textContent=r.length?`Import ${plural(r.length,'card')}`:'Import'; };
+  $('#f').onsubmit=e=>{ e.preventDefault(); const r=parseLines(ta.value); if(!r.length) return;
+    const have=new Set(d.cards.map(x=>x.h)); let added=0;
+    for(const x of r){ if(have.has(x.h)) continue; have.add(x.h); d.cards.push({id:uid('c'),...x,box:0,seen:false,due:0}); added++; }
+    changed(d.id); closeSheet(); updateDeck();
+    toast(added===r.length?`Imported ${plural(added,'card')}`:`Imported ${added}, skipped ${r.length-added} already in this deck`);
+  };
+}
+
+render();
+connect();
+})();
+</script>
