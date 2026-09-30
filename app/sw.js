@@ -1,5 +1,5 @@
 // Keeps the app working offline. Bump VERSION when you change any file.
-const VERSION = 'flashcards-v1';
+const VERSION = 'flashcards-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

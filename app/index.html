@@ -107,6 +107,20 @@ main{flex:1;display:flex;flex-direction:column;gap:16px;padding-bottom:24px}
 .muted{color:var(--muted)}
 .note{font-size:14px;color:var(--muted);text-align:center;margin:0}
 
+.opt{display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:transparent;width:100%;text-align:left;border-top:1px solid var(--line)}
+.opt:first-child{border-top:0}
+.opt .main{flex:1;min-width:0}
+.opt .name{font-weight:600}
+.opt .sub{color:var(--muted);font-size:13px}
+.opt .radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center}
+.opt[aria-pressed="true"] .radio{border-color:var(--accent)}
+.opt[aria-pressed="true"] .radio::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.opt:disabled{opacity:.45}
+.field select{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;font-size:16px;width:100%;min-width:0;-webkit-appearance:none;appearance:none}
+.stats.four{grid-template-columns:repeat(4,1fr);gap:8px}
+.stats.four .stat{padding:10px 10px}
+.stats.four .stat span{font-size:11px;letter-spacing:.03em}
+.stat.warn b{color:var(--seal)}
 /* Study */
 .study{flex:1;display:flex;flex-direction:column;gap:14px;padding-bottom:12px}
 .prog{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
@@ -222,22 +236,46 @@ const ICON = {
   more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
   close:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   speak:'<svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
+  gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
   chev:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
 };
 const GRID = '<svg viewBox="0 0 100 100" aria-hidden="true"><rect x="1" y="1" width="98" height="98" stroke-width="1.5"/><path d="M50 1V99M1 50H99" stroke-width=".8" stroke-dasharray="3 3"/><path d="M1 1L99 99M99 1L1 99" stroke-width=".6" stroke-dasharray="2 3"/></svg>';
 
+/* ---------- prefs (per device) ---------- */
+let prefs={dir:'h2m',mode:'due',order:'random',voice:'',rate:.8};
+try{Object.assign(prefs,JSON.parse(localStorage.getItem(PREF)||'{}'));}catch(e){}
+const savePrefs=()=>{try{localStorage.setItem(PREF,JSON.stringify(prefs));}catch(e){}};
+
+/* ---------- voice ---------- */
+let voices=[];
+function loadVoices(){ try{ voices=(window.speechSynthesis.getVoices()||[]).filter(v=>/^(zh|cmn)/i.test(v.lang)); }catch(e){ voices=[]; } }
+function voiceScore(v){
+  const l=v.lang.replace('_','-').toLowerCase(), n=(v.name+' '+v.voiceURI).toLowerCase();
+  let s=0;
+  if(l==='zh-cn'||l==='cmn-cn'||l.includes('hans')) s+=100; else if(l==='zh-tw'||l.includes('hant')) s+=40; else if(l==='zh-hk'||l.includes('yue')) s-=100;
+  if(n.includes('premium')) s+=30; else if(n.includes('enhanced')) s+=20;
+  if(/eloquence|compact|novelty/.test(n)) s-=15;
+  return s;
+}
+function pickVoice(){
+  if(prefs.voice){ const v=voices.find(v=>v.voiceURI===prefs.voice); if(v) return v; }
+  return voices.slice().sort((a,b)=>voiceScore(b)-voiceScore(a))[0]||null;
+}
+function voiceLabel(v){
+  const l=v.lang.replace('_','-');
+  const region=/hk|yue/i.test(l)?'Cantonese':/tw|hant/i.test(l)?'Taiwan':'Mainland';
+  return `${v.name} · ${region}`;
+}
+try{ loadVoices(); window.speechSynthesis&&window.speechSynthesis.addEventListener&&window.speechSynthesis.addEventListener('voiceschanged',loadVoices); }catch(e){}
 function speak(text){
   try{
     const s=window.speechSynthesis; if(!s||!window.SpeechSynthesisUtterance){toast('Audio isn’t available on this device');return;}
-    s.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=.8;
-    const v=s.getVoices().find(v=>/^zh[-_](CN|Hans)/i.test(v.lang)); if(v) u.voice=v; s.speak(u);
+    if(!voices.length) loadVoices();
+    s.cancel(); const u=new SpeechSynthesisUtterance(text);
+    const v=pickVoice(); if(v){u.voice=v;u.lang=v.lang;} else u.lang='zh-CN';
+    u.rate=prefs.rate||.8; s.speak(u);
   }catch(e){toast('Audio isn’t available on this device');}
 }
-
-/* ---------- prefs (per device) ---------- */
-let prefs={dir:'h2m'};
-try{Object.assign(prefs,JSON.parse(localStorage.getItem(PREF)||'{}'));}catch(e){}
-const savePrefs=()=>{try{localStorage.setItem(PREF,JSON.stringify(prefs));}catch(e){}};
 
 /* ---------- store (saved on this device) ---------- */
 const store={decks:{}};
@@ -252,8 +290,8 @@ const now=()=>Date.now();
 const isNew=c=>!c.seen;
 const isDue=c=>c.seen&&(c.due||0)<=now();
 function counts(deck){
-  let n=0,d=0,l=0; for(const c of deck.cards){ if(isNew(c)) n++; else if(isDue(c)) d++; if((c.box||0)>=3) l++; }
-  return {newC:n,due:d,learned:l,total:deck.cards.length,todo:d+Math.min(n,NEW_PER_SESSION)};
+  let n=0,d=0,l=0,w=0; for(const c of deck.cards){ if(isNew(c)) n++; else if(isDue(c)) d++; if((c.box||0)>=3) l++; if(c.wrong) w++; }
+  return {newC:n,due:d,learned:l,wrong:w,total:deck.cards.length,todo:d+Math.min(n,NEW_PER_SESSION)};
 }
 function nextBox(c,g){ const b=c.box||0; return g==='again'?0:g==='good'?Math.min(b+1,7):Math.min(b+2,7); }
 function fmtDays(n){ if(n===0) return 'now'; if(n<30) return n+'d'; if(n<365) return Math.round(n/30)+'mo'; return Math.round(n/365)+'y'; }
@@ -270,7 +308,6 @@ function go(v){ view=v; render(); window.scrollTo(0,0); }
 function refresh(){
   if(view.name==='home') render();
   else if(view.name==='deck'){ if(!store.decks[view.id]) go({name:'home'}); else updateDeck(); }
-  else if(view.name==='study'&&!store.decks[view.id]) go({name:'home'});
 }
 function render(){
   if(view.name==='home') renderHome();
@@ -285,6 +322,7 @@ function renderHome(){
   const todo=decks.reduce((s,d)=>s+counts(d).todo,0);
   app.innerHTML=`
   <header class="bar"><h1>Chinese Flashcards</h1>
+    <button class="icon-btn" id="settings" aria-label="Settings">${ICON.gear}</button>
     <button class="icon-btn" id="newDeck" aria-label="New deck">${ICON.plus}</button></header>
   <main>
     ${decks.length?`
@@ -294,6 +332,7 @@ function renderHome(){
         <div class="main"><div class="name">${esc(d.name)}</div><div class="sub">${plural(c.total,'card')} · ${c.learned} learned</div></div>
         <span class="chip ${c.todo?'':'zero'}">${c.todo?c.todo+' due':'done'}</span><span class="chev">${ICON.chev}</span>
       </button>`;}).join('')}</div>
+    ${decks.length>1?'<button class="btn primary block" id="studyAll">Study all decks</button>':''}
     `:`
     <div class="empty"><div class="han" aria-hidden="true">字</div><h2>No decks yet</h2>
       <p>Start with 32 common HSK 1 words, or make your own deck and add cards.</p>
@@ -303,7 +342,8 @@ function renderHome(){
     <button class="btn ghost block" id="backup">Back up or restore cards</button>
   </main>`;
   app.querySelectorAll('[data-deck]').forEach(b=>b.onclick=()=>go({name:'deck',id:b.dataset.deck}));
-  $('#backup').onclick=backupSheet;
+  $('#backup').onclick=backupSheet; $('#settings').onclick=settingsSheet;
+  const sa=$('#studyAll'); if(sa) sa.onclick=()=>studySheet(decks.map(d=>d.id));
   const nd=()=>deckSheet(); $('#newDeck').onclick=nd; const n2=$('#newDeck2'); if(n2) n2.onclick=nd;
   const st=$('#starter'); if(st) st.onclick=()=>{
     const id=uid('d'); store.decks[id]={id,name:'HSK 1 starter',created:now(),cards:STARTER.map(([h,p,m])=>({id:uid('c'),h,p:toMarks(p),m,box:0,seen:false,due:0}))};
@@ -319,11 +359,7 @@ function renderDeck(){
   <header class="bar"><button class="icon-btn" id="back" aria-label="Back to decks">${ICON.back}</button>
     <h1 id="deckName"></h1><button class="icon-btn" id="deckMenu" aria-label="Deck options">${ICON.more}</button></header>
   <main>
-    <div class="stats" id="stats"></div>
-    <div class="seg" role="group" aria-label="Card front">
-      <button id="dir-h2m" aria-pressed="${prefs.dir==='h2m'}">汉字 → English</button>
-      <button id="dir-m2h" aria-pressed="${prefs.dir==='m2h'}">English → 汉字</button>
-    </div>
+    <div class="stats four" id="stats"></div>
     <div id="studyBtns" class="stack"></div>
     <div class="section-h"><h2 id="cardsH">Cards</h2>
       <div class="btnrow" style="flex-wrap:nowrap"><button class="btn ghost" id="import" style="min-height:38px;padding:6px 12px">Import</button>
@@ -333,8 +369,6 @@ function renderDeck(){
   </main>`;
   $('#back').onclick=()=>{deckQuery='';go({name:'home'});};
   $('#deckMenu').onclick=()=>deckSheet(d.id);
-  $('#dir-h2m').onclick=()=>{prefs.dir='h2m';savePrefs();renderDeck();};
-  $('#dir-m2h').onclick=()=>{prefs.dir='m2h';savePrefs();renderDeck();};
   $('#addCard').onclick=()=>cardSheet(d.id);
   $('#import').onclick=()=>importSheet(d.id);
   $('#search').oninput=e=>{deckQuery=e.target.value;updateDeck();};
@@ -344,12 +378,9 @@ function updateDeck(){
   const d=store.decks[view.id]; if(!d) return;
   const c=counts(d);
   $('#deckName').textContent=d.name;
-  $('#stats').innerHTML=`<div class="stat"><b>${c.due}</b><span>Due</span></div><div class="stat"><b>${c.newC}</b><span>New</span></div><div class="stat"><b>${c.learned}</b><span>Learned</span></div>`;
-  $('#studyBtns').innerHTML = c.total===0 ? '' : c.todo
-    ? `<button class="btn primary block" id="study">Study ${plural(c.todo,'card')}</button>`
-    : `<p class="note">All caught up for today.</p><button class="btn ghost block" id="practice">Practice all ${plural(c.total,'card')} anyway</button>`;
-  const s=$('#study'); if(s) s.onclick=()=>startStudy(d.id,false);
-  const p=$('#practice'); if(p) p.onclick=()=>startStudy(d.id,true);
+  $('#stats').innerHTML=`<div class="stat"><b>${c.due}</b><span>Due</span></div><div class="stat"><b>${c.newC}</b><span>New</span></div><div class="stat ${c.wrong?'warn':''}"><b>${c.wrong}</b><span>Mistakes</span></div><div class="stat"><b>${c.learned}</b><span>Learned</span></div>`;
+  $('#studyBtns').innerHTML = c.total===0 ? '' : `<button class="btn primary block" id="study">Study</button>`;
+  const s=$('#study'); if(s) s.onclick=()=>studySheet([d.id]);
   $('#cardsH').textContent=`Cards · ${c.total}`;
   const q=deckQuery.trim().toLowerCase();
   const strip=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -369,26 +400,76 @@ function updateDeck(){
 
 /* ---------- study ---------- */
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function startStudy(deckId,all){
-  const d=store.decks[deckId];
-  let ids;
-  if(all) ids=shuffle(d.cards.map(c=>c.id));
-  else{
-    const due=d.cards.filter(isDue).map(c=>c.id);
-    const fresh=d.cards.filter(isNew).slice(0,NEW_PER_SESSION).map(c=>c.id);
-    ids=shuffle(due).concat(fresh);
-  }
-  go({name:'study',id:deckId,queue:ids,total:ids.length,done:0,again:0,revealed:false,dir:prefs.dir});
+function gather(deckIds){
+  const out=[]; for(const id of deckIds){ const d=store.decks[id]; if(d) d.cards.forEach(c=>out.push({d:id,c})); } return out;
 }
-function curCard(){ const d=store.decks[view.id]; if(!d) return null; while(view.queue.length){ const c=d.cards.find(x=>x.id===view.queue[0]); if(c) return c; view.queue.shift(); } return null; }
+function modePools(deckIds){
+  const all=gather(deckIds);
+  const due=all.filter(x=>isDue(x.c)), fresh=all.filter(x=>isNew(x.c)).slice(0,NEW_PER_SESSION);
+  return {
+    due: due.concat(fresh),
+    all: all,
+    mistakes: all.filter(x=>x.c.wrong).sort((a,b)=>(b.c.missAt||0)-(a.c.missAt||0))
+  };
+}
+function studySheet(deckIds){
+  const pools=modePools(deckIds);
+  let mode=prefs.mode; if(!pools[mode]||!pools[mode].length) mode=['due','mistakes','all'].find(m=>pools[m].length)||'all';
+  let order=prefs.order, dir=prefs.dir;
+  const scope=deckIds.length>1?'all decks':'this deck';
+  const MODES=[
+    ['due','Due today',n=>n?`${plural(n,'card')} ready · new words and reviews`:'Nothing due. You’re caught up'],
+    ['all','All cards',n=>`Every card in ${scope} · ${plural(n,'card')}`],
+    ['mistakes','Mistakes',n=>n?`${plural(n,'card')} you got wrong · a card leaves once you get it right`:'No mistakes to practice']
+  ];
+  openSheet(`<h2>Study ${deckIds.length>1?'all decks':esc(store.decks[deckIds[0]].name)}</h2>
+    <div class="list" role="radiogroup" aria-label="What to study">${MODES.map(([k,t,sub])=>`
+      <button class="opt" data-mode="${k}" aria-pressed="${mode===k}" ${pools[k].length?'':'disabled'}>
+        <span class="radio"></span><div class="main"><div class="name">${t}</div><div class="sub">${sub(pools[k].length)}</div></div></button>`).join('')}</div>
+    <div class="field"><label>Order</label><div class="seg" role="group" aria-label="Order">
+      <button data-order="random" aria-pressed="${order==='random'}">Random</button>
+      <button data-order="list" aria-pressed="${order==='list'}">In order</button></div></div>
+    <div class="field"><label>Card front</label><div class="seg" role="group" aria-label="Card front">
+      <button data-dir="h2m" aria-pressed="${dir==='h2m'}">中文 → English</button>
+      <button data-dir="m2h" aria-pressed="${dir==='m2h'}">English → 中文</button></div></div>
+    <button class="btn primary block" id="start">Start</button>`);
+  const root=$('#sheetRoot');
+  const sync=()=>{
+    root.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===mode));
+    root.querySelectorAll('[data-order]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.order===order));
+    root.querySelectorAll('[data-dir]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dir===dir));
+    const n=pools[mode].length; const st=$('#start'); st.disabled=!n; st.textContent=n?`Start · ${plural(n,'card')}`:'Nothing to study';
+  };
+  root.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;sync();});
+  root.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>{order=b.dataset.order;sync();});
+  root.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>{dir=b.dataset.dir;sync();});
+  sync();
+  $('#start').onclick=()=>{
+    Object.assign(prefs,{mode,order,dir}); savePrefs();
+    let items=pools[mode].slice(); if(order==='random') shuffle(items);
+    closeSheet();
+    const title=deckIds.length>1?'All decks':store.decks[deckIds[0]].name;
+    const modeName={due:'Due today',all:'All cards',mistakes:'Mistakes'}[mode];
+    go({name:'study',decks:deckIds,title,modeName,mode,queue:items.map(x=>x.d+'|'+x.c.id),total:items.length,done:0,again:0,missed:new Set(),revealed:false,dir});
+  };
+}
+function curItem(){
+  while(view.queue.length){
+    const [did,cid]=view.queue[0].split('|'); const d=store.decks[did]; const c=d&&d.cards.find(x=>x.id===cid);
+    if(c) return {c,d}; view.queue.shift();
+  }
+  return null;
+}
+function leaveStudy(){ flush(); go(view.decks.length===1&&store.decks[view.decks[0]]?{name:'deck',id:view.decks[0]}:{name:'home'}); }
 function renderStudy(){
-  const c=curCard();
-  const back=`<header class="bar"><button class="icon-btn" id="back" aria-label="Stop studying">${ICON.close}</button><h1>${esc(store.decks[view.id].name)}</h1><span class="muted" style="font-variant-numeric:tabular-nums">${c?view.queue.length+' left':''}</span></header>`;
+  const it=curItem(), c=it&&it.c;
+  const back=`<header class="bar"><button class="icon-btn" id="back" aria-label="Stop studying">${ICON.close}</button><h1>${esc(view.title)} <span class="muted" style="font-weight:500;font-size:15px">· ${esc(view.modeName)}</span></h1><span class="muted" style="font-variant-numeric:tabular-nums">${c?view.queue.length+' left':''}</span></header>`;
   if(!c){
     app.innerHTML=`${back}<main><div class="done"><div class="han" aria-hidden="true">好</div><h2 style="margin:0">Session complete</h2>
       <p class="muted" style="margin:0">You reviewed ${plural(view.done,'card')}${view.again?` and repeated ${view.again} you missed`:''}.</p>
-      <button class="btn primary" id="fin">Back to deck</button></div></main>`;
-    $('#back').onclick=$('#fin').onclick=()=>go({name:'deck',id:view.id}); return;
+      ${view.missed.size?`<p class="muted" style="margin:0">${plural(view.missed.size,'card')} added to Mistakes.</p>`:''}
+      <button class="btn primary" id="fin">Done</button></div></main>`;
+    $('#back').onclick=$('#fin').onclick=leaveStudy; return;
   }
   const h2m=view.dir==='h2m';
   const n=[...c.h].length, cls=n>6?'xlong':n>2?'long':'';
@@ -415,17 +496,17 @@ function renderStudy(){
     sp.onclick=e=>{e.stopPropagation();speak(c.h);};
     $('#card').appendChild(sp);
   }
-  $('#back').onclick=()=>{flush();go({name:'deck',id:view.id});};
+  $('#back').onclick=leaveStudy;
   const show=()=>{ if(!view.revealed){view.revealed=true;renderStudy();} };
   $('#card').onclick=show; const sb=$('#show'); if(sb) sb.onclick=show;
   app.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>grade(b.dataset.g));
 }
 function grade(g){
-  const c=curCard(); if(!c) return;
+  const it=curItem(); if(!it) return; const c=it.c, key=view.queue[0];
   applyGrade(c,g); view.queue.shift();
-  if(g==='again'){ view.again++; view.queue.splice(Math.min(3,view.queue.length),0,c.id); }
-  else view.done++;
-  view.revealed=false; changed(view.id); renderStudy();
+  if(g==='again'){ view.again++; view.missed.add(key); c.wrong=true; c.misses=(c.misses||0)+1; c.missAt=now(); view.queue.splice(Math.min(3,view.queue.length),0,key); }
+  else { view.done++; if(!view.missed.has(key)) c.wrong=false; }
+  view.revealed=false; changed(); renderStudy();
 }
 document.addEventListener('keydown',e=>{
   if(view.name!=='study'||$('#sheetRoot').firstChild||/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
@@ -489,7 +570,7 @@ function cardSheet(deckId,cardId){
   };
   if(c){
     armConfirm($('#del'),'Tap again to delete',()=>{ d.cards=d.cards.filter(x=>x.id!==c.id); changed(d.id); closeSheet(); updateDeck(); });
-    $('#reset').onclick=()=>{ Object.assign(c,{box:0,seen:false,due:0}); changed(d.id); closeSheet(); updateDeck(); toast('Card will show up as new'); };
+    $('#reset').onclick=()=>{ Object.assign(c,{box:0,seen:false,due:0,wrong:false}); changed(d.id); closeSheet(); updateDeck(); toast('Card will show up as new'); };
   }
 }
 
@@ -523,6 +604,30 @@ function importSheet(deckId){
     changed(d.id); closeSheet(); updateDeck();
     toast(added===r.length?`Imported ${plural(added,'card')}`:`Imported ${added}, skipped ${r.length-added} already in this deck`);
   };
+}
+
+/* ---------- settings ---------- */
+function settingsSheet(){
+  loadVoices();
+  const cur=pickVoice();
+  const sorted=voices.slice().sort((a,b)=>voiceScore(b)-voiceScore(a));
+  const rates=[['.6','Slow'],['.8','Normal'],['1','Fast']];
+  openSheet(`<h2>Settings</h2>
+    <div class="field"><label for="vsel">Chinese voice</label>
+      ${sorted.length?`<select id="vsel"><option value="">Automatic · best installed voice${cur&&!prefs.voice?` (${esc(cur.name)})`:''}</option>
+        ${sorted.map(v=>`<option value="${esc(v.voiceURI)}" ${prefs.voice===v.voiceURI?'selected':''}>${esc(voiceLabel(v))}</option>`).join('')}</select>`
+      :`<p class="note" style="text-align:left">No Chinese voices found on this device yet.</p>`}</div>
+    <div class="field"><label>Speaking speed</label><div class="seg" role="group" aria-label="Speaking speed">
+      ${rates.map(([r,t])=>`<button data-rate="${r}" aria-pressed="${String(prefs.rate)===r||(+prefs.rate===+r)}">${t}</button>`).join('')}</div></div>
+    <button class="btn ghost block" id="vtest">Play test: <span class="han" style="margin-left:4px">妈 麻 马 骂</span></button>
+    <p class="muted" style="margin:0;font-size:14px">You should hear four different tones: mā, má, mǎ, mà. For clearer tones, download a better voice: iPhone <b>Settings → Accessibility → Spoken Content → Voices → Chinese (China mainland)</b>, pick a voice marked <b>Premium</b> or <b>Enhanced</b>, and tap download. Then close and reopen this app and choose it above.</p>
+    <button class="btn ghost block" id="backup2">Back up or restore cards</button>`);
+  const root=$('#sheetRoot');
+  const vs=$('#vsel'); if(vs) vs.onchange=()=>{prefs.voice=vs.value;savePrefs();speak('你好');};
+  root.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>{prefs.rate=+b.dataset.rate;savePrefs();
+    root.querySelectorAll('[data-rate]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
+  $('#vtest').onclick=()=>speak('妈，麻，马，骂。');
+  $('#backup2').onclick=backupSheet;
 }
 
 /* ---------- backup ---------- */
