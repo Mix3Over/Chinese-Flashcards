@@ -758,20 +758,21 @@ function showPhoto(){
   };
   const pt=e=>{ const r=cv.getBoundingClientRect(); return {x:Math.max(0,Math.min(cv.width,(e.clientX-r.left)*cv.width/r.width)), y:Math.max(0,Math.min(cv.height,(e.clientY-r.top)*cv.height/r.height))}; };
   let start=null;
-  cv.onpointerdown=e=>{ start=pt(e); cv.setPointerCapture(e.pointerId); lk.sel={x:start.x,y:start.y,w:0,h:0}; draw(); };
+  cv.onpointerdown=e=>{ start=pt(e); try{cv.setPointerCapture(e.pointerId);}catch(_){} lk.sel={x:start.x,y:start.y,w:0,h:0}; draw(); };
   cv.onpointermove=e=>{ if(!start) return; const p=pt(e); lk.sel={x:Math.min(start.x,p.x),y:Math.min(start.y,p.y),w:Math.abs(p.x-start.x),h:Math.abs(p.y-start.y)}; draw(); };
   cv.onpointerup=cv.onpointercancel=()=>{ start=null; if(lk.sel&&(lk.sel.w<10||lk.sel.h<10)) lk.sel=null; draw(); };
   draw();
 }
-function cropCanvas(useSel){
-  const src=lk.photo, s=useSel&&lk.sel?lk.sel:{x:0,y:0,w:src.width,h:src.height};
-  const longest=Math.max(s.w,s.h), k=longest<900?900/longest:longest>2000?2000/longest:1;
+/* Image cleanup before reading. Each "variant" is a different way of separating the characters from the background;
+   the app reads several and keeps the one that scores best (confidence + how much forms real dictionary words). */
+const OCR_BLACKLIST='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789|_=~`\\^*<>[]{}()/@#$%&+"\'‘’“”«»—–-·•…,.;:!?，。、；：！？「」『』《》〈〉（）【】';
+function cropCanvas(sel,targetH){
+  const src=lk.photo, s=sel||{x:0,y:0,w:src.width,h:src.height};
+  let k; if(targetH) k=targetH/s.h; else { const L=Math.max(s.w,s.h); k=L<900?900/L:L>2000?2000/L:1; }
   const cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(s.w*k)); cv.height=Math.max(1,Math.round(s.h*k));
-  const ctx=cv.getContext('2d'); ctx.imageSmoothingQuality='high';
-  ctx.drawImage(src,s.x,s.y,s.w,s.h,0,0,cv.width,cv.height); return cv;
+  const ctx=cv.getContext('2d'); ctx.imageSmoothingQuality='high'; ctx.drawImage(src,s.x,s.y,s.w,s.h,0,0,cv.width,cv.height); return cv;
 }
-function grayOf(cv){ const d=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data, g=new Float32Array(cv.width*cv.height);
-  for(let i=0,j=0;i<d.length;i+=4,j++) g[j]=.299*d[i]+.587*d[i+1]+.114*d[i+2]; return g; }
+function lumOf(d){ const g=new Float32Array(d.length/4); for(let i=0,j=0;i<d.length;i+=4,j++) g[j]=.299*d[i]+.587*d[i+1]+.114*d[i+2]; return g; }
 function otsu(g){ const h=new Array(256).fill(0); for(const v of g) h[Math.max(0,Math.min(255,v|0))]++;
   let sum=0; for(let i=0;i<256;i++) sum+=i*h[i]; let sB=0,wB=0,best=-1,th=128;
   for(let i=0;i<256;i++){ wB+=h[i]; if(!wB) continue; const wF=g.length-wB; if(!wF) break; sB+=i*h[i]; const v=wB*wF*(sB/wB-(sum-sB)/wF)**2; if(v>best){best=v;th=i;} }
@@ -782,30 +783,47 @@ function boxBlur(g,W,H,r){ if(r<1) return g; const t=new Float32Array(g.length),
   for(let x=0;x<W;x++){ let s=0; for(let y=-r;y<=r;y++) s+=t[Math.min(H-1,Math.max(0,y))*W+x];
     for(let y=0;y<H;y++){ o[y*W+x]=s/n; s+=t[Math.min(H-1,y+r+1)*W+x]-t[Math.max(0,y-r)*W+x]; } }
   return o; }
-function grayCanvas(g,W,H){ const P=40, cv=document.createElement('canvas'); cv.width=W+2*P; cv.height=H+2*P; const ctx=cv.getContext('2d');
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); const im=ctx.createImageData(W,H);
+const darkBackground=g=>{ const th=otsu(g); let dark=0; for(const v of g) if(v<th) dark++; return dark>g.length/2; };
+const invert=g=>{ for(let j=0;j<g.length;j++) g[j]=255-g[j]; return g; };
+function stretch(g){ const s=Float32Array.from(g).sort(), lo=s[(s.length*.02)|0], hi=s[(s.length*.98)|0];
+  for(let j=0;j<g.length;j++) g[j]=(g[j]-lo)*255/Math.max(1,hi-lo); return g; }
+function sauvola(g,W,H,win,k){
+  const W1=W+1, I=new Float64Array(W1*(H+1)), I2=new Float64Array(W1*(H+1));
+  for(let y=1;y<=H;y++){ let s=0,s2=0; for(let x=1;x<=W;x++){ const v=g[(y-1)*W+x-1]; s+=v; s2+=v*v; I[y*W1+x]=I[(y-1)*W1+x]+s; I2[y*W1+x]=I2[(y-1)*W1+x]+s2; } }
+  const o=new Float32Array(g.length), r=win>>1;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const x0=Math.max(0,x-r),y0=Math.max(0,y-r),x1=Math.min(W,x+r+1),y1=Math.min(H,y+r+1),n=(x1-x0)*(y1-y0);
+    const s=I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0], s2=I2[y1*W1+x1]-I2[y0*W1+x1]-I2[y1*W1+x0]+I2[y0*W1+x0];
+    const m=s/n, sd=Math.sqrt(Math.max(0,s2/n-m*m));
+    o[y*W+x]=g[y*W+x]>m*(1+k*(sd/128-1))?255:0;
+  }
+  return o;
+}
+function toPadded(g,W,H){ const P=Math.round(Math.max(20,Math.min(H,W)*.25)), cv=document.createElement('canvas'); cv.width=W+2*P; cv.height=H+2*P;
+  const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); const im=ctx.createImageData(W,H);
   for(let j=0;j<g.length;j++){ const v=Math.max(0,Math.min(255,g[j])); im.data[j*4]=im.data[j*4+1]=im.data[j*4+2]=v; im.data[j*4+3]=255; }
   ctx.putImageData(im,P,P); return cv; }
-// Plain grayscale version, with light text on dark backgrounds turned into dark text on white.
-function prepGray(cv){
-  const W=cv.width,H=cv.height, g=grayOf(cv), th=otsu(g); let dark=0; for(const v of g) if(v<th) dark++;
-  if(dark>g.length/2) for(let j=0;j<g.length;j++) g[j]=255-g[j];
-  return grayCanvas(g,W,H);
+function variant(cv,mode,lineH){
+  const W=cv.width,H=cv.height, d=cv.getContext('2d').getImageData(0,0,W,H).data; let g=lumOf(d);
+  const win=(Math.max(15,Math.round(lineH*.5))|1);
+  if(mode==='gray'){ if(darkBackground(g)) invert(g); return toPadded(g,W,H); }
+  if(mode==='bw0'||mode==='bw1'){ if(darkBackground(g)) invert(g); stretch(g); g=boxBlur(g,W,H,mode==='bw1'?1:0); const t=otsu(g); for(let j=0;j<g.length;j++) g[j]=g[j]<t?0:255; return toPadded(g,W,H); }
+  if(mode==='local'){ if(darkBackground(g)) invert(g); g=boxBlur(g,W,H,1); return toPadded(sauvola(g,W,H,win,.2),W,H); }
+  if(mode==='bright'){ // light subtitles (white or yellow) on any background
+    for(let i=0,j=0;i<d.length;i+=4,j++){ const mx=Math.max(d[i],d[i+1],d[i+2]), mn=Math.min(d[i],d[i+1],d[i+2]); g[j]=255-(mx-(mx-mn)*.6); }
+    g=boxBlur(g,W,H,1); return toPadded(sauvola(g,W,H,win,.2),W,H);
+  }
 }
-// Cleaned black-and-white version: fixes contrast, smooths out screen patterns (TVs, monitors), then binarizes.
-function prepBW(cv,r){
-  const W=cv.width,H=cv.height; let g=grayOf(cv); const th=otsu(g); let dark=0; for(const v of g) if(v<th) dark++;
-  if(dark>g.length/2) for(let j=0;j<g.length;j++) g[j]=255-g[j];
-  const s=Float32Array.from(g).sort(), lo=s[(s.length*.02)|0], hi=s[(s.length*.98)|0];
-  for(let j=0;j<g.length;j++) g[j]=(g[j]-lo)*255/Math.max(1,hi-lo);
-  g=boxBlur(g,W,H,r); const t2=otsu(g); for(let j=0;j<g.length;j++) g[j]=g[j]<t2?0:255;
-  return grayCanvas(g,W,H);
-}
-function cleanOcr(text){
-  return String(text||'').split('\n').map(l=>l.replace(/[ \t]+/g,'').replace(/[|_=~`\\^*<>]/g,''))
-    .filter(l=>/\p{Script=Han}/u.test(l)).join('\n').trim();
+function cleanOcr(text,oneLine){
+  const lines=String(text||'').split('\n').map(l=>l.replace(/[^\p{Script=Han}]/gu,'')).filter(Boolean);
+  return oneLine?lines.join(''):lines.join('\n');
 }
 const hanCount=t=>(t.match(/\p{Script=Han}/gu)||[]).length;
+function dictCover(t){ // share of characters that belong to multi-character dictionary words
+  if(!DICT) return 0; const ch=[...t.replace(/\n/g,'')]; let i=0,c=0;
+  while(i<ch.length){ let L=Math.min(8,ch.length-i); for(;L>1;L--) if(DICT.map.has(ch.slice(i,i+L).join(''))) break; if(L>1){c+=L;i+=L;} else i++; }
+  return ch.length?c/ch.length:0;
+}
 let ocrBusy=false;
 async function runOcr(useSel){
   if(ocrBusy||!lk.photo) return; ocrBusy=true;
@@ -814,16 +832,25 @@ async function runOcr(useSel){
     if(!navigator.onLine&&!ocrWorker) lkStatus('Preparing the scanner…');
     const w=await getWorker(m=>lkStatus(m));
     lkStatus('Reading characters…');
-    const base=cropCanvas(useSel);
-    const tries=[()=>prepGray(base),()=>prepBW(base,0),()=>prepBW(base,1),()=>prepBW(base,3)];
-    let best=null;
-    for(let i=0;i<tries.length;i++){
-      if(i) lkStatus(`The text is hard to read. Trying a cleaner version (${i} of ${tries.length-1})…`);
-      const {data}=await w.recognize(tries[i]());
-      const text=cleanOcr(data&&data.text), conf=hanCount(text)?(data.confidence||0):0;
-      if(!best||conf>best.conf) best={text,conf};
-      if(best.conf>=80) break;
+    loadDict().catch(()=>{});
+    const sel=useSel&&lk.sel?lk.sel:null;
+    const oneLine=!!sel&&sel.w/sel.h>=1.6;   // a wide box = one line of text, like a subtitle
+    let plan;
+    if(oneLine){ const cv=cropCanvas(sel,100); plan=[['local','6'],['bright','6'],['bw0','6'],['local','7'],['bw1','6']].map(([m,p])=>({cv,m,p,lineH:100})); }
+    else { const cv=cropCanvas(sel,0); const lineH=Math.max(30,Math.round(Math.min(cv.width,cv.height)/6)); plan=[['gray','6'],['local','6'],['bw1','6']].map(([m,p])=>({cv,m,p,lineH})); }
+    let best=null; const seen=new Map();
+    for(let i=0;i<plan.length;i++){
+      const t=plan[i];
+      if(i) lkStatus(`Reading characters… trying another way (${i+1} of ${plan.length})`);
+      await w.setParameters({tessedit_pageseg_mode:t.p, tessedit_char_blacklist:OCR_BLACKLIST});
+      const {data}=await w.recognize(variant(t.cv,t.m,t.lineH));
+      const text=cleanOcr(data&&data.text,oneLine), conf=hanCount(text)?(data.confidence||0):0;
+      const score=conf/100+dictCover(text);
+      if(text&&(!best||score>best.score)) best={text,conf,score};
+      // two different methods agreeing with good confidence = done
+      if(text&&conf>=70){ if(seen.has(text)) break; seen.set(text,true); }
     }
+    if(!best) best={text:'',conf:0};
     if(!best.text){ lkStatus('No Chinese characters found. Try a closer, sharper photo, and draw the box tightly around the words.',true); }
     else { setText(best.text);
       lkStatus(best.conf<55?`Unsure about this one (${Math.round(best.conf)}% confidence). Check the characters, or try a sharper photo with a tighter box.`:'Done. Check the text below and fix any wrong characters.'); }
