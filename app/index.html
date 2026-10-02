@@ -121,6 +121,24 @@ main{flex:1;display:flex;flex-direction:column;gap:16px;padding-bottom:24px}
 .stats.four .stat{padding:10px 10px}
 .stats.four .stat span{font-size:11px;letter-spacing:.03em}
 .stat.warn b{color:var(--seal)}
+.lk-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lk-actions .btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.photo-wrap{display:flex;flex-direction:column;gap:10px}
+.photo-wrap canvas{width:100%;height:auto;max-width:100%;border-radius:12px;touch-action:none;display:block;background:var(--sunk)}
+.status{font-size:14px;color:var(--muted);margin:0;min-height:1.3em}
+.status.err{color:var(--seal)}
+.tip{font-size:13px;color:var(--muted);margin:0}
+.wrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line)}
+.wrow:first-child{border-top:0}
+.wrow .h{font-size:24px;line-height:1.2;flex:none;max-width:40%;overflow-wrap:anywhere}
+.wrow .main{flex:1;min-width:0}
+.wrow .p{font-size:14px}
+.wrow .m{color:var(--muted);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.wrow .cl{font-size:12px;color:var(--muted)}
+.wrow .add{min-height:36px;padding:6px 14px;flex:none}
+.wrow .add.done{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.wrow.unknown .m{font-style:italic}
+.credit{font-size:12px;color:var(--muted);text-align:center;margin:0}
 /* Study */
 .study{flex:1;display:flex;flex-direction:column;gap:14px;padding-bottom:12px}
 .prog{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
@@ -237,6 +255,8 @@ const ICON = {
   close:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   speak:'<svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
   gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
+  camera:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  paste:'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/></svg>',
   chev:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
 };
 const GRID = '<svg viewBox="0 0 100 100" aria-hidden="true"><rect x="1" y="1" width="98" height="98" stroke-width="1.5"/><path d="M50 1V99M1 50H99" stroke-width=".8" stroke-dasharray="3 3"/><path d="M1 1L99 99M99 1L1 99" stroke-width=".6" stroke-dasharray="2 3"/></svg>';
@@ -313,6 +333,7 @@ function render(){
   if(view.name==='home') renderHome();
   else if(view.name==='deck') renderDeck();
   else if(view.name==='study') renderStudy();
+  else if(view.name==='lookup') renderLookup();
 }
 const sortedDecks=()=>Object.values(store.decks).sort((a,b)=>(a.created||0)-(b.created||0));
 
@@ -322,6 +343,7 @@ function renderHome(){
   const todo=decks.reduce((s,d)=>s+counts(d).todo,0);
   app.innerHTML=`
   <header class="bar"><h1>Chinese Flashcards</h1>
+    <button class="icon-btn" id="lookup" aria-label="Scan or look up words">${ICON.camera}</button>
     <button class="icon-btn" id="settings" aria-label="Settings">${ICON.gear}</button>
     <button class="icon-btn" id="newDeck" aria-label="New deck">${ICON.plus}</button></header>
   <main>
@@ -342,7 +364,7 @@ function renderHome(){
     <button class="btn ghost block" id="backup">Back up or restore cards</button>
   </main>`;
   app.querySelectorAll('[data-deck]').forEach(b=>b.onclick=()=>go({name:'deck',id:b.dataset.deck}));
-  $('#backup').onclick=backupSheet; $('#settings').onclick=settingsSheet;
+  $('#backup').onclick=backupSheet; $('#settings').onclick=settingsSheet; $('#lookup').onclick=()=>go({name:'lookup',from:null});
   const sa=$('#studyAll'); if(sa) sa.onclick=()=>studySheet(decks.map(d=>d.id));
   const nd=()=>deckSheet(); $('#newDeck').onclick=nd; const n2=$('#newDeck2'); if(n2) n2.onclick=nd;
   const st=$('#starter'); if(st) st.onclick=()=>{
@@ -362,7 +384,7 @@ function renderDeck(){
     <div class="stats four" id="stats"></div>
     <div id="studyBtns" class="stack"></div>
     <div class="section-h"><h2 id="cardsH">Cards</h2>
-      <div class="btnrow" style="flex-wrap:nowrap"><button class="btn ghost" id="import" style="min-height:38px;padding:6px 12px">Import</button>
+      <div class="btnrow" style="flex-wrap:nowrap"><button class="btn ghost" id="scan" style="min-height:38px;padding:6px 12px">Scan</button><button class="btn ghost" id="import" style="min-height:38px;padding:6px 12px">Import</button>
       <button class="btn primary" id="addCard" style="min-height:38px;padding:6px 12px">${ICON.plus.replace('<svg','<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"')} Add</button></div></div>
     <input class="search" id="search" type="search" placeholder="Search characters, pinyin or meaning" autocomplete="off" value="${esc(deckQuery)}">
     <div id="cardList"></div>
@@ -371,6 +393,7 @@ function renderDeck(){
   $('#deckMenu').onclick=()=>deckSheet(d.id);
   $('#addCard').onclick=()=>cardSheet(d.id);
   $('#import').onclick=()=>importSheet(d.id);
+  $('#scan').onclick=()=>go({name:'lookup',from:d.id});
   $('#search').oninput=e=>{deckQuery=e.target.value;updateDeck();};
   updateDeck();
 }
@@ -603,6 +626,219 @@ function importSheet(deckId){
     for(const x of r){ if(have.has(x.h)) continue; have.add(x.h); d.cards.push({id:uid('c'),...x,box:0,seen:false,due:0}); added++; }
     changed(d.id); closeSheet(); updateDeck();
     toast(added===r.length?`Imported ${plural(added,'card')}`:`Imported ${added}, skipped ${r.length-added} already in this deck`);
+  };
+}
+
+/* ---------- dictionary (CC-CEDICT) ---------- */
+let DICT=null, dictLoading=null;
+const isHan=ch=>/\p{Script=Han}/u.test(ch);
+function entryRank(e){ return (/^[A-Z]/.test(e.p)?4:0)+(/^(old )?variant of|^see |^surname /i.test(e.en)?2:0)+(/^(archaic|old)/i.test(e.en)?1:0); }
+function loadDict(){
+  if(DICT) return Promise.resolve(DICT);
+  if(!dictLoading) dictLoading=(async()=>{
+    const res=await fetch('dict/cedict.txt'); if(!res.ok) throw new Error('dict');
+    const txt=await res.text(); const map=new Map(); let maxLen=1;
+    for(const line of txt.split('\n')){
+      if(!line) continue;
+      const [sim,tra,p,en]=line.split('\t'); const e={s:sim,t:tra||sim,p:p||'',en:en||''};
+      for(const k of (tra&&tra!==sim)?[sim,tra]:[sim]){ let a=map.get(k); if(!a) map.set(k,a=[]); a.push(e); const L=[...k].length; if(L>maxLen) maxLen=L; }
+    }
+    for(const a of map.values()) if(a.length>1) a.sort((x,y)=>entryRank(x)-entryRank(y));
+    DICT={map,maxLen:Math.min(maxLen,12)}; return DICT;
+  })().catch(e=>{dictLoading=null;throw e;});
+  return dictLoading;
+}
+function segment(text){
+  const chars=[...String(text).replace(/\s+/g,'')], out=[]; let i=0;
+  while(i<chars.length){
+    if(!isHan(chars[i])){i++;continue;}
+    let hit=null;
+    for(let L=Math.min(DICT.maxLen,chars.length-i);L>=1;L--){
+      const part=chars.slice(i,i+L); if(!part.every(isHan)) continue;
+      const w=part.join(''), e=DICT.map.get(w); if(e){hit={w,entries:e};break;}
+    }
+    if(hit){out.push(hit); i+=[...hit.w].length;} else {out.push({w:chars[i],entries:null}); i++;}
+  }
+  return out;
+}
+const refFix=d=>d.replace(/([^\s,|\[\]]+)\|([^\s,|\[\]]+)\[([^\]]+)\]/g,(_,t,s2,p)=>`${s2} (${toMarks(p)})`).replace(/([^\s,|\[\]]+)\[([^\]]+)\]/g,(_,s2,p)=>`${s2} (${toMarks(p)})`);
+function defsOf(en){ return en.split(' / ').filter(d=>d&&!/^CL:/.test(d)).map(refFix); }
+function classifierOf(en){ const m=en.split(' / ').find(d=>/^CL:/.test(d)); return m?refFix(m.replace(/^CL:/,'')).replace(/,/g,', '):''; }
+function cardMeaning(entries){
+  const e=entries[0]; let d=defsOf(e.en).filter(x=>!/^\(/.test(x));
+  if(!d.length) d=defsOf(e.en); if(!d.length) d=[e.en];
+  const out=[]; for(const x of d){ if(out.length&&(out.join('; ').length+x.length>50||out.length>=3)) break; out.push(x); }
+  return out.join('; ');
+}
+function findCard(h){ for(const d of Object.values(store.decks)){ if(d.cards.some(c=>c.h===h)) return d; } return null; }
+
+/* ---------- OCR (Tesseract, runs on the phone) ---------- */
+let ocrWorker=null, ocrLoading=null;
+function loadScript(src){ return new Promise((ok,no)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>no(new Error('script')); document.head.appendChild(s); }); }
+function getWorker(status){
+  if(ocrWorker) return Promise.resolve(ocrWorker);
+  if(!ocrLoading) ocrLoading=(async()=>{
+    status('Preparing the scanner. The first time this downloads about 6 MB…');
+    if(!window.Tesseract) await loadScript('vendor/tesseract.min.js');
+    ocrWorker=await Tesseract.createWorker('chi_sim',1,{
+      workerPath:'vendor/worker.min.js', corePath:'vendor/', langPath:'vendor/lang', gzip:true,
+      logger:m=>{ if(m&&m.status==='recognizing text') status(`Reading characters… ${Math.round((m.progress||0)*100)}%`); }
+    });
+    return ocrWorker;
+  })().catch(e=>{ocrLoading=null;throw e;});
+  return ocrLoading;
+}
+
+/* ---------- look up / scan screen ---------- */
+let lk={text:'',photo:null,sel:null,added:new Set()};
+function renderLookup(){
+  const from=view.from&&store.decks[view.from];
+  app.innerHTML=`
+  <header class="bar"><button class="icon-btn" id="back" aria-label="Back">${ICON.back}</button><h1>Look up words</h1></header>
+  <main>
+    <div class="lk-actions">
+      <button class="btn primary" id="takePhoto">${ICON.camera} Scan photo</button>
+      <button class="btn ghost" id="pasteBtn">${ICON.paste} Paste text</button>
+    </div>
+    <input id="photoIn" type="file" accept="image/*" hidden>
+    <p class="tip">For the most accurate reading, use your iPhone’s Live Text: in the Camera app, point at the text, tap the text button in the corner, tap Copy, then come back and tap Paste text.</p>
+    <div class="photo-wrap" id="photoWrap" hidden>
+      <canvas id="photoCv" aria-label="Your photo. Drag across the words you want to read."></canvas>
+      <p class="tip">Drag a box around the words you want. A smaller box reads faster and more accurately.</p>
+      <div class="btnrow"><button class="btn ghost" id="readAll">Read whole photo</button><button class="btn primary" id="readSel" disabled>Read selected area</button></div>
+    </div>
+    <p class="status" id="lkStatus"></p>
+    <div class="field"><label for="lkText">Chinese text <span style="font-weight:400">· you can fix any wrong characters here</span></label>
+      <textarea id="lkText" lang="zh-CN" placeholder="Scan a photo, paste, or type Chinese here" style="min-height:96px;font-size:20px">${esc(lk.text)}</textarea></div>
+    <div id="lkResults"></div>
+    <p class="credit">Dictionary: CC-CEDICT (CC BY-SA 4.0, mdbg.net). Text recognition: Tesseract.</p>
+  </main>`;
+  $('#back').onclick=()=>go(from?{name:'deck',id:from.id}:{name:'home'});
+  const pin=$('#photoIn');
+  $('#takePhoto').onclick=()=>pin.click();
+  pin.onchange=()=>{ const f=pin.files&&pin.files[0]; pin.value=''; if(f) loadPhoto(f); };
+  $('#pasteBtn').onclick=async()=>{
+    let t='';
+    try{ if(navigator.clipboard&&navigator.clipboard.readText) t=await navigator.clipboard.readText(); }catch(e){}
+    if(t){ setText(t); } else { const ta=$('#lkText'); ta.focus(); toast('Long-press the text box and tap Paste'); }
+  };
+  let tmr; $('#lkText').oninput=e=>{ lk.text=e.target.value; clearTimeout(tmr); tmr=setTimeout(showResults,250); };
+  $('#readAll').onclick=()=>runOcr(false);
+  $('#readSel').onclick=()=>runOcr(true);
+  if(lk.photo) showPhoto();
+  showResults();
+}
+function lkStatus(msg,err){ const el=$('#lkStatus'); if(el){ el.textContent=msg||''; el.classList.toggle('err',!!err); } }
+function setText(t){ lk.text=t; const ta=$('#lkText'); if(ta) ta.value=t; showResults(); }
+
+async function loadPhoto(file){
+  lkStatus('Opening photo…');
+  try{
+    const url=URL.createObjectURL(file); const img=new Image(); img.src=url; await img.decode();
+    const max=2200, k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+    const cv=document.createElement('canvas'); cv.width=Math.round(img.naturalWidth*k); cv.height=Math.round(img.naturalHeight*k);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height); URL.revokeObjectURL(url);
+    lk.photo=cv; lk.sel=null; showPhoto(); lkStatus('Drag a box around the words, or read the whole photo.');
+  }catch(e){ lkStatus('Could not open that photo. Try taking it again.',true); }
+}
+function showPhoto(){
+  const wrap=$('#photoWrap'), cv=$('#photoCv'), src=lk.photo; if(!wrap||!src) return;
+  wrap.hidden=false; cv.width=src.width; cv.height=src.height;
+  const ctx=cv.getContext('2d');
+  const draw=()=>{
+    ctx.drawImage(src,0,0);
+    const s=lk.sel;
+    if(s&&s.w>4&&s.h>4){
+      ctx.fillStyle='rgba(0,0,0,.45)';
+      ctx.fillRect(0,0,cv.width,s.y); ctx.fillRect(0,s.y+s.h,cv.width,cv.height-s.y-s.h);
+      ctx.fillRect(0,s.y,s.x,s.h); ctx.fillRect(s.x+s.w,s.y,cv.width-s.x-s.w,s.h);
+      ctx.strokeStyle='#4FBF94'; ctx.lineWidth=Math.max(3,cv.width/250); ctx.strokeRect(s.x,s.y,s.w,s.h);
+    }
+    $('#readSel').disabled=!(s&&s.w>10&&s.h>10);
+  };
+  const pt=e=>{ const r=cv.getBoundingClientRect(); return {x:Math.max(0,Math.min(cv.width,(e.clientX-r.left)*cv.width/r.width)), y:Math.max(0,Math.min(cv.height,(e.clientY-r.top)*cv.height/r.height))}; };
+  let start=null;
+  cv.onpointerdown=e=>{ start=pt(e); cv.setPointerCapture(e.pointerId); lk.sel={x:start.x,y:start.y,w:0,h:0}; draw(); };
+  cv.onpointermove=e=>{ if(!start) return; const p=pt(e); lk.sel={x:Math.min(start.x,p.x),y:Math.min(start.y,p.y),w:Math.abs(p.x-start.x),h:Math.abs(p.y-start.y)}; draw(); };
+  cv.onpointerup=cv.onpointercancel=()=>{ start=null; if(lk.sel&&(lk.sel.w<10||lk.sel.h<10)) lk.sel=null; draw(); };
+  draw();
+}
+function prepCrop(useSel){
+  const src=lk.photo, s=useSel&&lk.sel?lk.sel:{x:0,y:0,w:src.width,h:src.height};
+  const longest=Math.max(s.w,s.h), k=longest<900?900/longest:longest>2000?2000/longest:1;
+  const pad=Math.round(Math.min(s.w,s.h)*k*.15)+20;
+  const cv=document.createElement('canvas'); cv.width=Math.round(s.w*k)+pad*2; cv.height=Math.round(s.h*k)+pad*2;
+  const ctx=cv.getContext('2d'); ctx.imageSmoothingQuality='high';
+  const c0=src.getContext('2d').getImageData(Math.round(s.x),Math.round(s.y),1,1).data;
+  ctx.fillStyle=`rgb(${c0[0]},${c0[1]},${c0[2]})`; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.drawImage(src,s.x,s.y,s.w,s.h,pad,pad,cv.width-pad*2,cv.height-pad*2);
+  const im=ctx.getImageData(0,0,cv.width,cv.height), d=im.data;
+  for(let i=0;i<d.length;i+=4){ const g=.299*d[i]+.587*d[i+1]+.114*d[i+2]; d[i]=d[i+1]=d[i+2]=g; }
+  ctx.putImageData(im,0,0); return cv;
+}
+let ocrBusy=false;
+async function runOcr(useSel){
+  if(ocrBusy||!lk.photo) return; ocrBusy=true;
+  const btns=[$('#readAll'),$('#readSel')]; btns.forEach(b=>b&&(b.disabled=true));
+  try{
+    if(!navigator.onLine&&!ocrWorker) lkStatus('Preparing the scanner…');
+    const w=await getWorker(m=>lkStatus(m));
+    lkStatus('Reading characters…');
+    const {data}=await w.recognize(prepCrop(useSel));
+    const text=(data&&data.text||'').replace(/[ \t]+/g,'').replace(/\n{2,}/g,'\n').trim();
+    if(!/\p{Script=Han}/u.test(text)){ lkStatus('No Chinese characters found. Try a closer, sharper photo, or select a smaller area.',true); }
+    else { setText(text); lkStatus('Done. Check the text below and fix any wrong characters.'); }
+  }catch(e){
+    lkStatus(navigator.onLine?'The scanner could not start. Check your connection and try again.':'The scanner needs internet the first time. Connect once, scan a photo, and after that it works offline.',true);
+  }finally{ ocrBusy=false; btns.forEach(b=>b&&(b.disabled=false)); const rs=$('#readSel'); if(rs) rs.disabled=!(lk.sel&&lk.sel.w>10); }
+}
+async function showResults(){
+  const box=$('#lkResults'); if(!box) return;
+  const text=lk.text;
+  if(!/\p{Script=Han}/u.test(text)){ box.innerHTML=''; return; }
+  if(!DICT){ box.innerHTML='<p class="note">Loading dictionary…</p>'; try{ await loadDict(); }catch(e){ box.innerHTML='<p class="note">The dictionary could not load. Connect to the internet once so it can be saved on your phone.</p>'; return; } if(lk.text!==text) return; }
+  const seen=new Set(), words=[];
+  for(const x of segment(text)){ const key=x.entries?x.entries[0].s:x.w; if(seen.has(key)) continue; seen.add(key); words.push(x); }
+  box.innerHTML=`<div class="section-h" style="margin-bottom:8px"><h2>Words · ${words.length}</h2></div><div class="list">${words.map((x,i)=>{
+    if(!x.entries) return `<div class="wrow unknown"><span class="h han">${esc(x.w)}</span><div class="main"><div class="m">Not in the dictionary</div></div><button class="btn ghost add" data-i="${i}">Add</button></div>`;
+    const e=x.entries[0], p=toMarks(e.p), inDeck=findCard(e.s), cl=classifierOf(e.en);
+    const others=x.entries.slice(1).filter(o=>o.p.toLowerCase()!==e.p.toLowerCase()).slice(0,2);
+    return `<div class="wrow"><span class="h han">${hanziHTML(e.s,p)}</span>
+      <div class="main"><div class="p">${pinyinHTML(p)}${e.t!==e.s?` <span class="muted">· ${esc(e.t)}</span>`:''}</div>
+        <div class="m">${esc(defsOf(e.en).join('; ')||e.en)}</div>
+        ${cl?`<div class="cl">Measure word: ${esc(cl)}</div>`:''}
+        ${others.map(o=>`<div class="cl">Also ${esc(toMarks(o.p))}: ${esc(defsOf(o.en).slice(0,2).join('; '))}</div>`).join('')}</div>
+      ${inDeck?`<button class="btn add done" data-i="${i}" aria-label="Already in ${esc(inDeck.name)}. Add again">In deck</button>`:`<button class="btn primary add" data-i="${i}">Add</button>`}</div>`;
+  }).join('')}</div>`;
+  box.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
+    const x=words[+b.dataset.i];
+    const card=x.entries?{h:x.entries[0].s,p:toMarks(x.entries[0].p),m:cardMeaning(x.entries)}:{h:x.w,p:'',m:''};
+    addWordSheet(card);
+  });
+}
+function addWordSheet(card){
+  const decks=sortedDecks();
+  const pre=(view.from&&store.decks[view.from])?view.from:(prefs.addDeck&&store.decks[prefs.addDeck])?prefs.addDeck:(decks[0]&&decks[0].id)||'__new';
+  openSheet(`<h2>Add to flashcards</h2>
+    <form id="f" class="stack" style="gap:14px">
+      <div class="field"><label for="dk">Deck</label><select id="dk">
+        ${decks.map(d=>`<option value="${esc(d.id)}" ${d.id===pre?'selected':''}>${esc(d.name)}</option>`).join('')}
+        <option value="__new" ${pre==='__new'?'selected':''}>New deck…</option></select></div>
+      <div class="field" id="ndField" ${pre==='__new'?'':'hidden'}><label for="nd">New deck name</label><input id="nd" maxlength="60" value="Scanned words"></div>
+      <div class="field"><label for="ch">Characters</label><input id="ch" class="han" lang="zh-CN" value="${esc(card.h)}" required></div>
+      <div class="field"><label for="cp">Pinyin</label><input id="cp" value="${esc(card.p)}" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="preview" id="pv"></div></div>
+      <div class="field"><label for="cm">Meaning <span style="font-weight:400">· shorten it if you like</span></label><input id="cm" value="${esc(card.m)}" required></div>
+      <button class="btn primary block" type="submit">Add card</button>
+    </form>`);
+  const dk=$('#dk'), cp=$('#cp');
+  dk.onchange=()=>{ $('#ndField').hidden=dk.value!=='__new'; };
+  const upd=()=>{ const m=toMarks(cp.value); $('#pv').innerHTML=m&&m!==cp.value.trim()?pinyinHTML(m):''; }; cp.oninput=upd; upd();
+  $('#f').onsubmit=e=>{ e.preventDefault();
+    const h=$('#ch').value.trim(), p=toMarks(cp.value), m=$('#cm').value.trim(); if(!h||!m) return;
+    let id=dk.value;
+    if(id==='__new'){ const name=$('#nd').value.trim()||'Scanned words'; id=uid('d'); store.decks[id]={id,name,created:now(),cards:[]}; }
+    store.decks[id].cards.unshift({id:uid('c'),h,p,m,box:0,seen:false,due:0});
+    prefs.addDeck=id; savePrefs(); changed(); closeSheet(); showResults(); toast(`Added to ${store.decks[id].name}`);
   };
 }
 
