@@ -1,6 +1,6 @@
 // Keeps the app working offline. Bump VERSION when you change any app file.
 // Big files (scanner and dictionary) live in a separate cache that survives app updates.
-const VERSION = 'flashcards-v3';
+const VERSION = 'flashcards-v4';
 const DATA = 'flashcards-data-v1';
 const FILES = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {

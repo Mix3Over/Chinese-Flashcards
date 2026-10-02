@@ -704,7 +704,7 @@ function renderLookup(){
     <p class="tip">For the most accurate reading, use your iPhone’s Live Text: in the Camera app, point at the text, tap the text button in the corner, tap Copy, then come back and tap Paste text.</p>
     <div class="photo-wrap" id="photoWrap" hidden>
       <canvas id="photoCv" aria-label="Your photo. Drag across the words you want to read."></canvas>
-      <p class="tip">Drag a box around the words you want. A smaller box reads faster and more accurately.</p>
+      <p class="tip">Drag a box around the words you want. Draw the box tightly around the characters for the best result.</p>
       <div class="btnrow"><button class="btn ghost" id="readAll">Read whole photo</button><button class="btn primary" id="readSel" disabled>Read selected area</button></div>
     </div>
     <p class="status" id="lkStatus"></p>
@@ -763,19 +763,49 @@ function showPhoto(){
   cv.onpointerup=cv.onpointercancel=()=>{ start=null; if(lk.sel&&(lk.sel.w<10||lk.sel.h<10)) lk.sel=null; draw(); };
   draw();
 }
-function prepCrop(useSel){
+function cropCanvas(useSel){
   const src=lk.photo, s=useSel&&lk.sel?lk.sel:{x:0,y:0,w:src.width,h:src.height};
   const longest=Math.max(s.w,s.h), k=longest<900?900/longest:longest>2000?2000/longest:1;
-  const pad=Math.round(Math.min(s.w,s.h)*k*.15)+20;
-  const cv=document.createElement('canvas'); cv.width=Math.round(s.w*k)+pad*2; cv.height=Math.round(s.h*k)+pad*2;
+  const cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(s.w*k)); cv.height=Math.max(1,Math.round(s.h*k));
   const ctx=cv.getContext('2d'); ctx.imageSmoothingQuality='high';
-  const c0=src.getContext('2d').getImageData(Math.round(s.x),Math.round(s.y),1,1).data;
-  ctx.fillStyle=`rgb(${c0[0]},${c0[1]},${c0[2]})`; ctx.fillRect(0,0,cv.width,cv.height);
-  ctx.drawImage(src,s.x,s.y,s.w,s.h,pad,pad,cv.width-pad*2,cv.height-pad*2);
-  const im=ctx.getImageData(0,0,cv.width,cv.height), d=im.data;
-  for(let i=0;i<d.length;i+=4){ const g=.299*d[i]+.587*d[i+1]+.114*d[i+2]; d[i]=d[i+1]=d[i+2]=g; }
-  ctx.putImageData(im,0,0); return cv;
+  ctx.drawImage(src,s.x,s.y,s.w,s.h,0,0,cv.width,cv.height); return cv;
 }
+function grayOf(cv){ const d=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data, g=new Float32Array(cv.width*cv.height);
+  for(let i=0,j=0;i<d.length;i+=4,j++) g[j]=.299*d[i]+.587*d[i+1]+.114*d[i+2]; return g; }
+function otsu(g){ const h=new Array(256).fill(0); for(const v of g) h[Math.max(0,Math.min(255,v|0))]++;
+  let sum=0; for(let i=0;i<256;i++) sum+=i*h[i]; let sB=0,wB=0,best=-1,th=128;
+  for(let i=0;i<256;i++){ wB+=h[i]; if(!wB) continue; const wF=g.length-wB; if(!wF) break; sB+=i*h[i]; const v=wB*wF*(sB/wB-(sum-sB)/wF)**2; if(v>best){best=v;th=i;} }
+  return th; }
+function boxBlur(g,W,H,r){ if(r<1) return g; const t=new Float32Array(g.length), o=new Float32Array(g.length), n=2*r+1;
+  for(let y=0;y<H;y++){ let s=0; for(let x=-r;x<=r;x++) s+=g[y*W+Math.min(W-1,Math.max(0,x))];
+    for(let x=0;x<W;x++){ t[y*W+x]=s/n; s+=g[y*W+Math.min(W-1,x+r+1)]-g[y*W+Math.max(0,x-r)]; } }
+  for(let x=0;x<W;x++){ let s=0; for(let y=-r;y<=r;y++) s+=t[Math.min(H-1,Math.max(0,y))*W+x];
+    for(let y=0;y<H;y++){ o[y*W+x]=s/n; s+=t[Math.min(H-1,y+r+1)*W+x]-t[Math.max(0,y-r)*W+x]; } }
+  return o; }
+function grayCanvas(g,W,H){ const P=40, cv=document.createElement('canvas'); cv.width=W+2*P; cv.height=H+2*P; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); const im=ctx.createImageData(W,H);
+  for(let j=0;j<g.length;j++){ const v=Math.max(0,Math.min(255,g[j])); im.data[j*4]=im.data[j*4+1]=im.data[j*4+2]=v; im.data[j*4+3]=255; }
+  ctx.putImageData(im,P,P); return cv; }
+// Plain grayscale version, with light text on dark backgrounds turned into dark text on white.
+function prepGray(cv){
+  const W=cv.width,H=cv.height, g=grayOf(cv), th=otsu(g); let dark=0; for(const v of g) if(v<th) dark++;
+  if(dark>g.length/2) for(let j=0;j<g.length;j++) g[j]=255-g[j];
+  return grayCanvas(g,W,H);
+}
+// Cleaned black-and-white version: fixes contrast, smooths out screen patterns (TVs, monitors), then binarizes.
+function prepBW(cv,r){
+  const W=cv.width,H=cv.height; let g=grayOf(cv); const th=otsu(g); let dark=0; for(const v of g) if(v<th) dark++;
+  if(dark>g.length/2) for(let j=0;j<g.length;j++) g[j]=255-g[j];
+  const s=Float32Array.from(g).sort(), lo=s[(s.length*.02)|0], hi=s[(s.length*.98)|0];
+  for(let j=0;j<g.length;j++) g[j]=(g[j]-lo)*255/Math.max(1,hi-lo);
+  g=boxBlur(g,W,H,r); const t2=otsu(g); for(let j=0;j<g.length;j++) g[j]=g[j]<t2?0:255;
+  return grayCanvas(g,W,H);
+}
+function cleanOcr(text){
+  return String(text||'').split('\n').map(l=>l.replace(/[ \t]+/g,'').replace(/[|_=~`\\^*<>]/g,''))
+    .filter(l=>/\p{Script=Han}/u.test(l)).join('\n').trim();
+}
+const hanCount=t=>(t.match(/\p{Script=Han}/gu)||[]).length;
 let ocrBusy=false;
 async function runOcr(useSel){
   if(ocrBusy||!lk.photo) return; ocrBusy=true;
@@ -784,10 +814,19 @@ async function runOcr(useSel){
     if(!navigator.onLine&&!ocrWorker) lkStatus('Preparing the scanner…');
     const w=await getWorker(m=>lkStatus(m));
     lkStatus('Reading characters…');
-    const {data}=await w.recognize(prepCrop(useSel));
-    const text=(data&&data.text||'').replace(/[ \t]+/g,'').replace(/\n{2,}/g,'\n').trim();
-    if(!/\p{Script=Han}/u.test(text)){ lkStatus('No Chinese characters found. Try a closer, sharper photo, or select a smaller area.',true); }
-    else { setText(text); lkStatus('Done. Check the text below and fix any wrong characters.'); }
+    const base=cropCanvas(useSel);
+    const tries=[()=>prepGray(base),()=>prepBW(base,0),()=>prepBW(base,1),()=>prepBW(base,3)];
+    let best=null;
+    for(let i=0;i<tries.length;i++){
+      if(i) lkStatus(`The text is hard to read. Trying a cleaner version (${i} of ${tries.length-1})…`);
+      const {data}=await w.recognize(tries[i]());
+      const text=cleanOcr(data&&data.text), conf=hanCount(text)?(data.confidence||0):0;
+      if(!best||conf>best.conf) best={text,conf};
+      if(best.conf>=80) break;
+    }
+    if(!best.text){ lkStatus('No Chinese characters found. Try a closer, sharper photo, and draw the box tightly around the words.',true); }
+    else { setText(best.text);
+      lkStatus(best.conf<55?`Unsure about this one (${Math.round(best.conf)}% confidence). Check the characters, or try a sharper photo with a tighter box.`:'Done. Check the text below and fix any wrong characters.'); }
   }catch(e){
     lkStatus(navigator.onLine?'The scanner could not start. Check your connection and try again.':'The scanner needs internet the first time. Connect once, scan a photo, and after that it works offline.',true);
   }finally{ ocrBusy=false; btns.forEach(b=>b&&(b.disabled=false)); const rs=$('#readSel'); if(rs) rs.disabled=!(lk.sel&&lk.sel.w>10); }
